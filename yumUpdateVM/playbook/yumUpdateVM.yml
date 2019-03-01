@@ -1,0 +1,66 @@
+- hosts: all
+  user: root
+  vars_files:
+    - vars.yml
+
+  tasks:
+  - name: echo hello
+    command: echo hello
+
+  - name: check current kernel version
+    shell: uname -r
+    register: kernel_version_current
+
+  - debug: msg="{{ kernel_version_current.stdout}}"
+
+  - name: Add the latest repository
+    yum_repository:
+      name: rhel-x-latest
+      description: rhel-x-latest
+      baseurl: "{{ baseurl_repo }}"
+      gpgcheck: no
+
+  - name: Remove old rhelx repo from rhel_new.repo
+    yum_repository:
+      name: rhelx
+      file: rhel_new
+      state: absent
+    notify: yum-clean-metadata
+
+  - name: upgrade all packages
+    yum: name=* state=latest
+    register: task_result
+
+  - name: Reboot after update
+    shell: "sleep 5 && reboot"
+    async: 1
+    poll: 0
+    when: task_result is changed
+
+  - name: Wait for the reboot to complete
+    wait_for_connection:
+      connect_timeout: 20
+      sleep: 5
+      delay: 5
+      timeout: 300
+    when: task_result is changed
+
+  - name: check new kernel version
+    shell: uname -r
+    register: kernel_version_new
+
+  - debug: msg="{{ kernel_version_new.stdout }}"
+
+  - debug:
+      msg: "update failed as can not get kernel version"
+    when: kernel_version_new.stdout == ""
+
+  - debug:
+      msg: "update successfully"
+    when: kernel_version_new.stdout != kernel_version_current.stdout
+
+  handlers:
+    - name: yum-clean-metadata
+      command: yum clean metadata
+      args:
+        warn: no

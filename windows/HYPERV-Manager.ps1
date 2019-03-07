@@ -104,7 +104,7 @@ function NewVMFromVHDX([String]$vmPath, [Switch]$gen2, [String]$switchName, [Str
     return $true
 }
 
-function VMSetup([String]$vmPath, [String]$vmName, [String]$image, [String]$omni_ip, [String]$omni_port, [String]$omni_user, [Bool]$gen2, [String]$switchName, [Int64]$cpuCount, [Int64]$mem, [String]$snapshotName, [String]$kernelName)
+function VMSetup([String]$vmPath, [String]$vmName, [String]$image, [String]$omni_ip, [String]$omni_port, [String]$omni_user, [Bool]$gen2, [String]$switchName, [Int64]$cpuCount, [Int64]$mem)
 {
     GetImage -vmPath $vmPath -vmName $vmName -image $image -omni_ip $omni_ip -omni_port $omni_port -omni_user $omni_user
     # remove vm if already exists same name VM already exists

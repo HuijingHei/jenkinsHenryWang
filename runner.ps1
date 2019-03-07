@@ -175,7 +175,7 @@ switch ($action)
                 Set-Location $args[0]; `
                 .\HYPERV-Manager $args[1] -dual $args[2] -name $args[3] -version $args[4] -release $args[5] -image $args[6] -buildID $args[7] -gen2 $args[8] -omni_ip $args[9] -omni_port $args[10] -omni_user $args[11] -build $args[12]`
             } `
-            -ArgumentList $hostFolder, $action, $dual, $env:name, $env:version, $env:release, $env:IMAGE, $env:BUILD_ID, $gen2, $env:OMNI_IP, $env:API_PORT, $env:OMNI_USER, $env:ComposeVersion
+            -ArgumentList $hostFolder, $action, "", "", "", "", $env:IMAGE, "", $gen2, $env:OMNI_IP, $env:API_PORT, $env:OMNI_USER, $env:ComposeVersion
         }
     }
 }

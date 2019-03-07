@@ -12,7 +12,8 @@ param (
     [Int64] $memorySize = 2,
     [String] $omni_ip,
     [String] $omni_port,
-    [String] $omni_user
+    [String] $omni_user,
+    [String] $build_ver
 )
 
 if ($dual)
@@ -149,6 +150,43 @@ function VMSetup([String]$vmPath, [String]$vmName, [String]$image, [String]$omni
     }
 }
 
+function VMStart([String]$vmPath, [String]$vmName, [String]$image, [String]$omni_ip, [String]$omni_port, [String]$omni_user, [Bool]$gen2, [String]$switchName, [Int64]$cpuCount, [Int64]$mem)
+{
+    GetImage -vmPath $vmPath -vmName $vmName -image $image -omni_ip $omni_ip -omni_port $omni_port -omni_user $omni_user
+    # remove vm if already exists same name VM already exists
+    VMRemove -vmName $vmName
+    # Create vm based on new vhdx file
+    if ($gen2)
+    {
+        NewVMFromVHDX -vmPath "${vmPath}${vmName}.vhdx" -gen2 -switchName $switchName -vmName $vmName -cpuCount $cpuCount -mem $mem
+    }
+    else
+    {
+        NewVMFromVHDX -vmPath "${vmPath}${vmName}.vhdx" -switchName $switchName -vmName $vmName -cpuCount $cpuCount -mem $mem
+    }
+    # Now Start the VM
+    Write-Host "Info: Starting VM $vmName."
+    $timeout = 300
+    Start-VM -Name $vmName
+    WaitForVMToStartKVP -vmName $vmName -timeout $timeout
+    $vmIP = GetIPv4ViaKVP $vmName
+
+    Write-Output y | plink -l root -i ssh\3rd_id_rsa.ppk $vmIP "exit 0"
+
+    if ($vmIP)
+    {
+        Write-Host "Info: Get $vmName IP = $vmIP"
+        VMStop -vmName $vmName
+        return $vmIP
+    }
+    else
+    {
+        Write-host "ERROR: Unable get correct kernel version" -ErrorAction SilentlyContinue
+        VMStop -vmName $vmName
+        VMRemove -vmName $vmName -vmPath $vmPath
+    }
+}
+
 switch ($action)
 {
     "add"
@@ -166,5 +204,10 @@ switch ($action)
         {
             VMRemove -vmName $vmNameB
         }
+    }
+    "start"
+    {
+        $vmName = "image-${build_ver}-gen1"
+        VMStart -vmPath $vmPath -vmName $vmName -image $image -omni_ip $omni_ip -omni_port $omni_port -omni_user $omni_user -gen2 $gen2 -switchName $switchName -cpuCount $cpuCount -mem $memorySize
     }
 }

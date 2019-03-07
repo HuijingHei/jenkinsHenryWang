@@ -151,4 +151,31 @@ switch ($action)
         Write-Output y | windows\bin\pscp -P $env:API_PORT -l $env:OMNI_USER -i windows\ssh\3rd_id_rsa.ppk ".\report-${env:HOST_ID}${smoke}-${env:owner}-${env:id}.xml" ${env:OMNI_IP}:
         Write-Host "Info: Action PUT exit code: $global:LastExitCode"
     }
+    "start"
+    {
+        if ($esxi)
+        {
+            Set-Location ".\windows"
+            .\ESX-Manager $action -dual $dual -name $env:name -version $env:version -release $env:release -image $env:IMAGE -buildID $env:BUILD_ID -gen2 $gen2 -omni_ip $env:OMNI_IP -omni_port $env:API_PORT -omni_user $env:OMNI_USER -hostID $env:HOST_ID -vsphereServer $env:ENVVISIPADDR -vsphereProtocol $env:ENVVISPROTOCOL -credential $cred
+            Write-Host "Info: Action ADD exit code: $global:LastExitCode"
+        }
+        else
+        {
+            Write-Host "Info: Starting to remove $hostFolder"
+            Invoke-Command -computername $env:HOST_ID -Credential $cred -scriptblock {(Test-Path $args[0]) -and (Remove-Item $args[0] -Confirm:$false -recurse -Force)} -ArgumentList $hostFolder
+
+            Write-Host "Info: Starting to copy windows folder from JSlave to $hostFolder on $env:HOST_ID"
+            $Session = New-PSSession -ComputerName $env:HOST_ID -Credential $cred
+            Copy-Item ".\windows" -Destination $hostFolder -ToSession $Session -Recurse
+            Remove-PSSession -Session $Session
+
+            Write-Host "Info: Running HYPERV-Manager on $env:HOST_ID"
+            Invoke-Command -computername $env:HOST_ID -Credential $cred -scriptblock `
+            { `
+                Set-Location $args[0]; `
+                .\HYPERV-Manager $args[1] -dual $args[2] -name $args[3] -version $args[4] -release $args[5] -image $args[6] -buildID $args[7] -gen2 $args[8] -omni_ip $args[9] -omni_port $args[10] -omni_user $args[11] -build $args[12]`
+            } `
+            -ArgumentList $hostFolder, $action, $dual, $env:name, $env:version, $env:release, $env:IMAGE, $env:BUILD_ID, $gen2, $env:OMNI_IP, $env:API_PORT, $env:OMNI_USER, $env:BUILD
+        }
+    }
 }

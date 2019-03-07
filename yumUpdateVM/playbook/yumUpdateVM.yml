@@ -20,11 +20,10 @@
       baseurl: "{{ baseurl_repo }}"
       gpgcheck: no
 
-  - name: Remove old rhelx repo from rhel_new.repo
-    yum_repository:
-      name: rhelx
-      file: rhel_new
+  - name: Remove /etc/yum.repo/rhel.repo
+    file:
       state: absent
+      path: /etc/yum.repo/rhel.repo
     notify: yum-clean-metadata
 
   - name: upgrade all packages

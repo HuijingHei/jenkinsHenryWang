@@ -9,7 +9,6 @@ pipeline {
         }
     }
     environment {
-        RHEL_VER = sh(returnStdout: true, script: 'echo ${ComposeVersion%*-*}').trim()
         API_PORT = sh(returnStdout: true, script: 'awk -v min=1025 -v max=9999 \'BEGIN{srand(); print int(min+rand()*(max-min+1))}\'').trim()
         HV = sh(returnStdout: true, script: """
                 if [[ $release = *"hyperv"* ]] || [[ $release = *"hyper-v"* ]] || [[ $release = *"hyper"* ]]; then 
@@ -67,7 +66,7 @@ pipeline {
                 ENVVISIPADDR = credentials('vsphere-ip')
                 ENVVISPROTOCOL = 'HTTPS'
                 HOST_ID = '2019-196-101'
-                IMAGE = "image-${RHEL_VER}-gen1.vhdx"
+                IMAGE = "image-${ComposeVersion}-gen1.vhdx"
             }
             agent {
                 node {

@@ -207,7 +207,7 @@ switch ($action)
     }
     "start"
     {
-        $vmName = "image-${compose_ver}-gen1"
-        VMStart -vmPath $vmPath -vmName $vmName -image $image -omni_ip $omni_ip -omni_port $omni_port -omni_user $omni_user -gen2 $gen2 -switchName $switchName -cpuCount $cpuCount -mem $memorySize
+        $vmNameTMP = $image.replace(".vhdx","")
+        VMStart -vmPath $vmPath -vmName $vmNameTMP -image $image -omni_ip $omni_ip -omni_port $omni_port -omni_user $omni_user -gen2 $gen2 -switchName $switchName -cpuCount $cpuCount -mem $memorySize
     }
 }

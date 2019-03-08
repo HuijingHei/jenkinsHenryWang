@@ -177,7 +177,6 @@ function VMStart([String]$vmPath, [String]$vmName, [String]$image, [String]$omni
     if ($vmIP)
     {
         Write-Host "Info: Get $vmName IP = $vmIP"
-        VMStop -vmName $vmName
         return $vmIP
     }
     else

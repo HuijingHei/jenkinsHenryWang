@@ -32,7 +32,7 @@ pipeline {
             }
             steps {
                 script {
-                    currentBuild.displayName = "${env.owner}-${env.version}-${env.release}-${env.id}"
+                    currentBuild.displayName = "update-${env.ComposeVersion}-${env.id}"
                 }
                 echo 'Running Omni Container...'
                 sh """

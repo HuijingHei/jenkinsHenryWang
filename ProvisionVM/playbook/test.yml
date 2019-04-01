@@ -1,0 +1,46 @@
+---
+- hosts: all
+  remote_user: root
+  vars:
+    url: ""
+
+  tasks:
+  - name: test
+    command: echo "{{ url }}"
+    tags: test
+
+  - name: Get current kernel version
+    shell: uname -r
+    register: kernel_ver_cur
+
+  - debug: msg="{{ kernel_ver_cur.stdout}}"
+
+  - name: Upgrade pkg from a remote repo
+    yum:
+      name: "{{ url }}"
+      state: present
+    register: result
+    failed_when: result is failed
+    tags: packages
+
+  - name: Reboot after update
+    shell: "sleep 5 && reboot"
+    async: 1
+    poll: 0
+    when: result is changed
+
+  - name: Wait for the reboot to complete
+    wait_for_connection:
+      connect_timeout: 20
+      sleep: 5
+      delay: 5
+      timeout: 300
+    when: result is changed
+
+  - name: Get new kernel version
+    shell: uname -r
+    register: kernel_ver_new
+    failed_when: kernel_ver_new.stdout == ""
+    changed_when: kernel_ver_new.stdout != kernel_ver_cur.stdout
+
+  - debug: msg="{{ kernel_ver_new.stdout}}"

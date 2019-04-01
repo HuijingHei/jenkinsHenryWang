@@ -1,6 +1,0 @@
-- hosts: all
-  user: root
-
-  tasks:
-  - name: echo hello
-    command: echo hello

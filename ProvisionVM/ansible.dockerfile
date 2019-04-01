@@ -16,4 +16,4 @@ ENV ANSIBLE_SSH_PIPELINING True
 
 WORKDIR /ansible
 
-ENTRYPOINT ["ansible-playbook"]
+#ENTRYPOINT ["ansible-playbook"]

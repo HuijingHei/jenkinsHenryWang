@@ -172,10 +172,9 @@ function VMStart([String]$vmPath, [String]$vmName, [String]$image, [String]$omni
     WaitForVMToStartKVP -vmName $vmName -timeout $timeout
     $vmIP = GetIPv4ViaKVP $vmName
 
-    Write-Output y | plink -l root -i ssh\3rd_id_rsa.ppk $vmIP "exit 0"
-
     if ($vmIP)
     {
+        Write-Output y | plink -l root -i ssh\3rd_id_rsa.ppk $vmIP "exit 0"
         Write-Host "Info: Get $vmName IP = $vmIP"
         return $vmIP
     }
@@ -208,6 +207,8 @@ switch ($action)
     "start"
     {
         $vmNameTMP = $image.replace(".vhdx","")
-        VMStart -vmPath $vmPath -vmName $vmNameTMP -image $image -omni_ip $omni_ip -omni_port $omni_port -omni_user $omni_user -gen2 $gen2 -switchName $switchName -cpuCount $cpuCount -mem $memorySize
+        $ip1 = VMStart -vmPath $vmPath -vmName $vmNameTMP -image $image -omni_ip $omni_ip -omni_port $omni_port -omni_user $omni_user -gen2 $gen2 -switchName $switchName -cpuCount $cpuCount -mem $memorySize
+        Write-output $ip1 | Out-File -FilePath .\hosts -Encoding ASCII
+        Write-Output y | pscp -l root -i ssh\3rd_id_rsa.ppk -P $omni_port .\hosts root@${omni_ip}:~/
     }
 }

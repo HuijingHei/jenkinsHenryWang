@@ -39,12 +39,11 @@ pipeline {
                     sudo docker network inspect jenkins >/dev/null 2>&1 || sudo docker network create jenkins
                     sudo docker pull henrywangxf/jenkins:latest
                     sudo docker ps --quiet --all --filter 'name=omni-${API_PORT}' | sudo xargs --no-run-if-empty docker rm -f
-                    sudo docker volume ls --quiet --filter 'name=kernels-volume-${API_PORT}' | sudo xargs --no-run-if-empty docker volume rm
                     sudo docker volume inspect nfs-${API_PORT} > /dev/null 2>&1 || \
                         sudo docker volume create --driver local \
                         --opt type=nfs --opt o=addr=${NFS_IP} --opt device=:${NFS_PATH} nfs-${API_PORT}
 	                sudo docker run -d --name omni-${API_PORT} --restart=always \
-                        -p ${API_PORT}:22 -v kernels-volume-${API_PORT}:/kernels -v nfs-${API_PORT}:/kernels/nfs \
+                        -p ${API_PORT}:22 -v nfs-${API_PORT}:/kernels/nfs \
                         --network jenkins --security-opt label=disable \
                         -e AUTHORIZED_KEYS=\"${PUBLIC_KEY}\" \
                         henrywangxf/jenkins:latest
@@ -82,8 +81,6 @@ pipeline {
                 script {
                     currentBuild.displayName = "hv-gating-${env.ComposeVer}-${env.id}"
                 }
-                echo 'Checkout VM Provision Code'
-                checkout scm
                 echo 'Gen1 VM Provision on 2016'
                 powershell 'Get-ChildItem Env:'
                 RunPowershellCommand(".\\runner.ps1 -action start")
@@ -91,11 +88,6 @@ pipeline {
         }
 
         stage('Hyper-V 2016 Gen1 - Provision VM') {
-            environment {
-                PUBLIC_KEY = credentials('3rd_id_rsa_pub')
-                NFS_IP = credentials('nfs-ip')
-                NFS_PATH = credentials('nfs-path')
-            }
             agent {
                 node {
                     label '3rd-CIBUS'
@@ -107,18 +99,15 @@ pipeline {
                     currentBuild.displayName = "VM-Provision-${env.id}"
                 }
                 echo 'Running Ansible Container...'
-                checkout scm
-                sh """
-                    cd ProvisonVM
-                    sudo cp /root/hosts ./playbook/
-                    sudo docker build -t ansible -f ProvisionVM\ansible.dockerfile
-                    sudo docker run --name ansible-test -d ansible --version
-                    CID=`docker ps | awk 'NR > 1 {print $1; exit}'`
-                    sudo docker cp $CID:/root/.ssh/id_rsa.pub /root/
-                    sudo docker rm ansible-test
-                    sudo docker run --name test1 --rm -it ansible ansible-playbook test.yml --tags test -i ./hosts -e "url=http://test" -v
-                """
                 sh 'printenv'
+                sh """
+                    sudo cp /root/hosts ProvisionVM/playbook/
+                    sudo docker build -t ansible -f ProvisionVM/ansible.dockerfile .
+                    sudo docker run --name ansible-test -d ansible ansible-playbook --version
+                    CID=\$(docker ps | awk 'NR > 1 {print \$1; exit}')
+                    sudo docker cp \$CID:/root/.ssh/id_rsa.pub /root/
+                    sudo docker run --name test1 --rm -it ansible ansible-playbook test.yml --tags test -e \"url=http://test\" -v
+                """
                 cleanWs()
             }
         }
@@ -130,13 +119,13 @@ pipeline {
             echo 'Start result analyzer and email sender container'
             echo 'Remove volume'
             sh """
-                sudo docker ps --quiet --all --filter 'name=omni-func-${API_PORT}' | sudo xargs --no-run-if-empty docker rm -f
+                sudo docker ps --quiet --all --filter 'name=omni-${API_PORT}' | sudo xargs --no-run-if-empty docker rm -f
+                sudo docker ps --quiet --all --filter 'name=ansible-test' | sudo xargs --no-run-if-empty docker rm -f
                 #sudo docker run --rm --name mailbot-${API_PORT} \
                 #        -v kernels-volume-func-${API_PORT}:/kernels --network jenkins \
                 #        henrywangxf/jenkins:latest \
                 #        python3 ./mailbot.py --path /kernels --mail ${FROM} --task ${TASK_URL_PREFIX} --smtp ${SMTP} --hv ${HV}
-                sudo docker volume ls --quiet --filter 'name=kernels-volume-func-${API_PORT}' | sudo xargs --no-run-if-empty docker volume rm
-                sudo docker volume ls --quiet --filter 'name=nfs-func-${API_PORT}' | sudo xargs --no-run-if-empty docker volume rm
+                sudo docker volume ls --quiet --filter 'name=nfs-${API_PORT}' | sudo xargs --no-run-if-empty docker volume rm
             """
             // sudo docker volume ls --quiet --filter 'name=kernels-volume-${API_PORT}' | sudo xargs --no-run-if-empty docker volume rm
             // sudo docker rmi -f henrywangxf/jenkins:latest

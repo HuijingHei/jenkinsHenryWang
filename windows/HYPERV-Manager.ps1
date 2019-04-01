@@ -44,7 +44,9 @@ function GetImage([String]$vmPath, [String]$vmName, [String]$image, [String]$omn
         Write-Host "Info: Create new vhdx directory $vmPath"
     }
 
+    #Write-Output y | bin\plink -P $omni_port -l $omni_user -i ssh\3rd_id_rsa.ppk ${omni_ip} "exit 0"
     Write-Output y | bin\pscp -P $omni_port -l $omni_user -i ssh\3rd_id_rsa.ppk ${omni_ip}:nfs/${image} "${vmPath}${vmName}.vhdx"
+    return $?
 }
 
 function NewVMFromVHDX([String]$vmPath, [Switch]$gen2, [String]$switchName, [String]$vmName, [Int64]$cpuCount, [Int64]$mem)
@@ -152,10 +154,15 @@ function VMSetup([String]$vmPath, [String]$vmName, [String]$image, [String]$omni
 
 function VMStart([String]$vmPath, [String]$vmName, [String]$image, [String]$omni_ip, [String]$omni_port, [String]$omni_user, [Bool]$gen2, [String]$switchName, [Int64]$cpuCount, [Int64]$mem)
 {
-    write-host "Info: vmName is $vmName"
-    GetImage -vmPath $vmPath -vmName $vmName -image $image -omni_ip $omni_ip -omni_port $omni_port -omni_user $omni_user
     # remove vm if already exists same name VM already exists
     VMRemove -vmName $vmName
+
+    write-host "Info: vmName is $vmName"
+    $status = GetImage -vmPath $vmPath -vmName $vmName -image $image -omni_ip $omni_ip -omni_port $omni_port -omni_user $omni_user
+    if ($status -eq $false) {
+        return $null
+    }
+    
     # Create vm based on new vhdx file
     if ($gen2)
     {
@@ -208,7 +215,14 @@ switch ($action)
     {
         $vmNameTMP = $image.replace(".vhdx","")
         $ip1 = VMStart -vmPath $vmPath -vmName $vmNameTMP -image $image -omni_ip $omni_ip -omni_port $omni_port -omni_user $omni_user -gen2 $gen2 -switchName $switchName -cpuCount $cpuCount -mem $memorySize
-        Write-output $ip1 | Out-File -FilePath .\hosts -Encoding ASCII
-        Write-Output y | pscp -l root -i ssh\3rd_id_rsa.ppk -P $omni_port .\hosts root@${omni_ip}:~/
+        if ( $ip1[-1] ) {
+            Write-output $ip1[-1] | Out-File -FilePath .\hosts -Encoding ASCII
+            write-host "INFO: get-content hosts"
+            get-content .\hosts
+            write-host "-----------------"
+            Write-Output y | pscp -l root -i ssh\3rd_id_rsa.ppk .\hosts root@${omni_ip}:/root/
+        } else {
+            return $false
+        }
     }
 }

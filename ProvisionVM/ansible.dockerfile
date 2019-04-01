@@ -5,10 +5,8 @@ RUN dnf -y install ansible && \
 
 RUN mkdir /ansible
 RUN ssh-keygen -q -m PEM -t rsa -N '' -f /root/.ssh/id_rsa
-COPY playbook/vars.yml /ansible/
-COPY playbook/yumUpdateVM.yml /ansible
-COPY playbook/test.yml /ansible
-COPY playbook/hosts /etc/ansible/hosts
+COPY ./ProvisionVM/playbook/test.yml /ansible
+COPY ./ProvisionVM/playbook/hosts /etc/ansible/hosts
 
 ENV ANSIBLE_HOST_KEY_CHECKING false
 ENV ANSIBLE_RETRY_FILES_ENABLED false

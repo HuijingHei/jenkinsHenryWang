@@ -1,0 +1,99 @@
+#!/usr/bin/python3
+"""Work for Jenkins CI to download brew package"""
+
+import os
+import time
+import argparse
+import urllib.request
+import urllib.error
+from datetime import datetime
+import hwlogging
+import brewer
+
+
+def download(logger, url, path):
+    """Download brew package"""
+    file_name = url.split("/")[-1]
+    full_path = os.path.join(path, file_name)
+    if os.path.isfile(full_path):
+        os.remove(full_path)
+    try:
+        with urllib.request.urlopen(url) as req:
+            total_size = int(req.info()["Content-Length"])
+            logger.info("Downloading file size is {}M.".
+                        format(total_size/1024/1024))
+            insize = 0
+            CHUNK = 256 * 1024  # 256K buffer
+            with open(full_path, "wb") as f:
+                start_time = time.time()
+                logger.info("Start downloading {0:} at {1:%Y-%m-%d %H:%M:%S}.".
+                            format(file_name,
+                                   datetime.fromtimestamp(start_time)))
+                for buf in iter(lambda: req.read(CHUNK), b''):
+                    if not buf:
+                        logger.debug("buf: {}".format(buf))
+                    f.write(buf)
+                    insize += len(buf)
+                    logger.debug("Downloading... {0:.2f}%".
+                                 format(insize/total_size * 100))
+                end_time = time.time()
+                logger.info("End downloading {0:} at {1:%Y-%m-%d %H:%M:%S}.".
+                            format(file_name,
+                                   datetime.fromtimestamp(end_time)))
+                delta_time = end_time - start_time
+                logger.info("Totaly spent {:02}:{:02}:{:02}.".
+                            format(delta_time//3600,
+                                   delta_time % 3600//60,
+                                   delta_time % 60))
+    except urllib.error.HTTPError as e:
+        if hasattr(e, "reason"):
+            logger.error("Download failed because {}.".format(e.reason))
+        elif hasattr(e, "code"):
+            logger.error("Download failed with error code {}.".format(e.code))
+    except urllib.error.URLError as e:
+        if hasattr(e, "reason"):
+            logger.error("Download failed because {}.".format(e.reason))
+        elif hasattr(e, "code"):
+            logger.error("Download failed with error code {}.".format(e.code))
+
+
+def main(args):
+    """Programe bget starts from here."""
+    # Print all avaliable arguments passed in.
+    logger = hwlogging.Logger(
+        os.path.basename(__file__) + ".log",
+        os.path.dirname(os.path.abspath(__file__)) + "/"
+    ).logger
+    logger.info("Working on package: {0}.".format(args.name))
+    logger.info("Brew task ID: {0}.".format(args.id))
+    logger.info("Build arch: {0}.".format(args.arch))
+    logger.info("Download path: {0}.".format(args.path))
+    logger.info("Download URL file path: {0}.".format(args.urlfile))	
+    brew = brewer.Brewer()
+    urls = brew.download_url(args.id, args.name, args.arch)
+
+    #Write url information to file
+    print(urls,  file=open(args.urlfile, 'w'))
+
+    # for url in urls:
+    #     args.download(logger, url, args.path)
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(
+            description='Work with brew package download'
+    )
+    parser.add_argument("name", metavar="package-name", type=str,
+                        help="package name with format \
+                        {name-version-release} or {name} for scratch build")
+    parser.add_argument("--id", type=int, required=True, help="brew task ID")
+    parser.add_argument("--arch", type=str, help="package arch")
+    parser.add_argument('--download', action='store_const', const=download,required=False,
+                        help='download brew package')
+    parser.add_argument("--path", type=str, default='./',
+                        help="path to store kernel")
+    parser.add_argument("--urlfile", type=str, default='./url',
+                        help="file path to store rpm url ")
+    args = parser.parse_args()
+
+    main(args)

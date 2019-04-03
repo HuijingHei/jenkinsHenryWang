@@ -6,7 +6,7 @@
 
   tasks:
   - name: test
-    command: echo "{{ url }}"
+    command: echo hello
     tags: test
 
   - name: Get current kernel version

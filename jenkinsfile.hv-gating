@@ -53,7 +53,7 @@ pipeline {
             }
         }
 
-        stage('Hyper-V 2016 Gen1 - Start VM') {
+        stage('Hyper-V 2016 Gen1 - Load Image') {
             options {
                 timeout(time: 2, unit: 'HOURS')
             }
@@ -66,12 +66,12 @@ pipeline {
                 ENVVISPROTOCOL = 'HTTPS'
                 HOST_ID = '2019-196-101'
                 ComposeVer = 'rhel-8.0.0'
-                IMAGE = "image-${ComposeVer}-gen1.vhdx"
+                IMAGE = "image-${ComposeVer}-test.vhdx"
             }
             agent {
                 node {
                     label '3rd-CIVAN'
-                    customWorkspace "workspace/2016-g1-start-vm-${env.BUILD_ID}"
+                    customWorkspace "workspace/2016-g1-load-image-${env.BUILD_ID}"
                 }
             }
             when {
@@ -99,14 +99,12 @@ pipeline {
                     currentBuild.displayName = "VM-Provision-${env.id}"
                 }
                 echo 'Running Ansible Container...'
-                sh 'printenv'
+                //sh 'printenv'
                 sh """
-                    sudo cp /root/hosts ProvisionVM/playbook/
-                    sudo docker build -t ansible -f ProvisionVM/ansible.dockerfile .
-                    sudo docker run --name ansible-test -d ansible ansible-playbook --version
-                    CID=\$(docker ps | awk 'NR > 1 {print \$1; exit}')
-                    sudo docker cp \$CID:/root/.ssh/id_rsa.pub /root/
-                    sudo docker run --name test1 --rm -it ansible ansible-playbook test.yml --tags test -e \"url=http://test\" -v
+                    cd ProvisionVM/
+                    sudo cp /root/hosts playbook/
+                    #sudo docker build -t ansible -f ansible.dockerfile .
+                    sudo docker run --name test1 --rm -v /root/hosts:/ansible/hosts -v \$PWD/playbook/test.yml:/ansible/test.yml ansible test.yml -i ./hosts --tags test -e \"url=http://test\" -v
                 """
                 cleanWs()
             }
@@ -120,12 +118,14 @@ pipeline {
             echo 'Remove volume'
             sh """
                 sudo docker ps --quiet --all --filter 'name=omni-${API_PORT}' | sudo xargs --no-run-if-empty docker rm -f
-                sudo docker ps --quiet --all --filter 'name=ansible-test' | sudo xargs --no-run-if-empty docker rm -f
+                sudo docker ps --quiet --all | sudo xargs --no-run-if-empty docker rm -f
                 #sudo docker run --rm --name mailbot-${API_PORT} \
                 #        -v kernels-volume-func-${API_PORT}:/kernels --network jenkins \
                 #        henrywangxf/jenkins:latest \
                 #        python3 ./mailbot.py --path /kernels --mail ${FROM} --task ${TASK_URL_PREFIX} --smtp ${SMTP} --hv ${HV}
                 sudo docker volume ls --quiet --filter 'name=nfs-${API_PORT}' | sudo xargs --no-run-if-empty docker volume rm
+                #sudo docker rmi -f ansible
+                sudo docker rmi -f fedora:latest
             """
             // sudo docker volume ls --quiet --filter 'name=kernels-volume-${API_PORT}' | sudo xargs --no-run-if-empty docker volume rm
             // sudo docker rmi -f henrywangxf/jenkins:latest

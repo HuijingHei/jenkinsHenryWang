@@ -16,7 +16,8 @@ COPY playbook/ansible.pub /root/.ssh/id_rsa.pub
 COPY playbook/ansible /root/.ssh/id_rsa
 COPY playbook/hosts ${ANSIBLEDIR}
 COPY playbook/test.yml ${ANSIBLEDIR}
+COPY ../docker/brew.py ${ANSIBLEDIR}
 
 WORKDIR ${ANSIBLEDIR}
 
-ENTRYPOINT ["ansible-playbook"]
+#ENTRYPOINT ["ansible-playbook"]

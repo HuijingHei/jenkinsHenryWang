@@ -1,4 +1,4 @@
-#!/bin/bash -x
+#!/bin/bash
 
 function GetInfo()
 {
@@ -67,7 +67,7 @@ touch $vars
 [ "x$SCRATCH" != "x" ] && ( echo "SCRATCH=$SCRATCH" >> $vars ) || (echo "ERROR: SCRATCH is empty"; exit 100)
 [ "x$ISSUER" != "x" ] && ( echo "ISSUER=$ISSUER" >> $vars ) || (echo "ERROR: ISSUER is empty"; exit 100)
 [ "x$NVR" != "x" ] && ( echo "NVR=$NVR" >> $vars ) || (echo "ERROR: NVR is empty"; exit 100)
-[ "x$URL_LIST" != "x" ] && ( echo "URL_LIST=$URL_LIST" >> $vars ) || (echo "ERROR: URL_LIST is empty"; exit 100)
+[ "x$URL_LIST" != "x" ] && ( echo "URL_LIST=\"$URL_LIST\"" >> $vars ) || (echo "ERROR: URL_LIST is empty"; exit 100)
 [ "x$THREAD_ID" != "x" ] && ( echo "THREAD_ID=$THREAD_ID" >> $vars ) || (echo "ERROR: THREAD_ID is empty"; exit 100)
 
 echo "==========="

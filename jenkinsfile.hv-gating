@@ -25,7 +25,7 @@ pipeline {
                     currentBuild.displayName = "Get-Info-${env.id}"
                 }
                 sh "./ProvisionVM/build.sh '${CI_MESSAGES}' ${TASK_URL_PREFIX} ${BREW_API}"
-                sh 'printenv'
+                //sh 'printenv'
                 stash includes: 'vars.properties', name: 'vars'
             }
         }
@@ -40,11 +40,12 @@ pipeline {
                     currentBuild.displayName = "Omni-Server-Provision-${env.id}"
                 }
                 unstash "vars"
-                sh """
-                    source ./vars
-                    echo '---------${URL_LIST}'
-                """
-                sh 'printenv'
+                sh '''
+                    #cat ./vars.properties
+                    source ./vars.properties                    
+                    echo "---------$NVR"
+                '''
+                //sh 'printenv'
                 cleanWs()
             }
         }
@@ -75,7 +76,11 @@ pipeline {
                     currentBuild.displayName = "hv-gating-${env.ComposeVer}-${env.id}"
                 }
                 unstash "vars"
-                powershell 'write-host "----{env:NVR}"'
+                powershell '''
+                    $NVR = (get-content vars.properties | where-object {$_ -like "NVR*"}).split("=")[1]
+                    write-host "---------$NVR"
+                '''
+                cleanWs()
             }
         }
 

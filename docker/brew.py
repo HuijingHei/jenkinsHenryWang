@@ -40,14 +40,17 @@ def main(args):
     logging.debug("All build RPMS {0}".format(rpms))
  
     for rpm in rpms:
-        if args.name in rpm or \
-            args.name.replace("kernel", "kernel-core") in rpm or \
-            args.name.replace("kernel", "kernel-modules") in rpm:
-                download_urls.append(URL_PREFIX + rpm)
+        if args.name.find('kernel')!=-1:
+            if args.name in rpm or \
+                args.name.replace("kernel", "kernel-core") in rpm or \
+                args.name.replace("kernel", "kernel-modules") in rpm:
+                    download_urls.append(URL_PREFIX + rpm)
+        elif rpm.find('debug')==-1 :
+            download_urls.append(URL_PREFIX + rpm)
  
     logging.info("Found RPM {0}".format(download_urls))
  
-    print("\"{0}\"".format(" ".join(download_urls)))
+    print("{0}".format(" ".join(download_urls)))
     #print(" ".join(download_urls))
  
 if __name__ == '__main__':

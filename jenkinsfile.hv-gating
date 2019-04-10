@@ -12,24 +12,25 @@ pipeline {
         API_PORT = sh(returnStdout: true, script: 'awk -v min=1025 -v max=9999 \'BEGIN{srand(); print int(min+rand()*(max-min+1))}\'').trim()
         FROM = credentials('email-3rd-qe-list')
         SMTP = credentials('smtp-server-address')
-        TASK_URL_PREFIX = credentials('task-url-prefix')
+        NVR = ""
     }
     stages {
         stage('Get info from CI Messages') {
             environment {
                 CI_MESSAGES = '''{"info": {"weight": 0.2, "parent": null, "completion_time": "2019-03-12 07:16:06.852154", "request": ["git://pkgs.devel.redhat.com/rpms/hyperv-daemons#074b42ef499625b3d310ff0998ce434f87634042", "rhel-8.0.0-candidate", {"scratch": true}], "start_time": "2019-03-12 07:12:54.204516", "start_ts": 1552374774.20452, "state": 2, "awaited": null, "label": null, "priority": 20, "channel_id": 21, "waiting": false, "create_time": "2019-03-12 07:12:52.866539", "id": 20993672, "create_ts": 1552374772.86654, "owner": 4977, "host_id": 229, "completion_ts": 1552374966.85215, "arch": "noarch", "method": "build", "result": null}, "attribute": "state", "old": "OPEN", "new": "CLOSED"}'''
                 BREW_API = credentials('3rd-brew-api-address')
+                TASK_URL_PREFIX = credentials('task-url-prefix')
             }
             steps {
                 script {
-                    currentBuild.displayName = "Get-Info-${env.id}"
+                    currentBuild.displayName = "hv-gating-get-Info-${env.id}"
                 }
                 sh "./ProvisionVM/build.sh '${CI_MESSAGES}' ${TASK_URL_PREFIX} ${BREW_API}"
                 //sh 'printenv'
                 stash includes: 'vars.properties', name: 'vars'
             }
         }
-        stage('Omni Server Provision') {
+        stage('Start Nginx') {
             environment {
                 PUBLIC_KEY = credentials('3rd_id_rsa_pub')
                 NFS_IP = credentials('nfs-ip')
@@ -37,15 +38,19 @@ pipeline {
             }
             steps {
                 script {
-                    currentBuild.displayName = "Omni-Server-Provision-${env.id}"
+                    currentBuild.displayName = "hv-gating-start-nginx-${env.id}"
                 }
-                unstash "vars"
-                sh '''
-                    #cat ./vars.properties
-                    source ./vars.properties                    
-                    echo "---------$NVR"
-                '''
-                //sh 'printenv'
+                sh """
+                    sudo docker network inspect jenkins >/dev/null 2>&1 || sudo docker network create jenkins
+                    sudo docker pull nginx:latest
+                    sudo docker volume inspect nfs-${API_PORT} > /dev/null 2>&1 || \
+                        sudo docker volume create --driver local \
+                        --opt type=nfs --opt o=addr=${NFS_IP} --opt device=:${NFS_PATH} nfs-${API_PORT}
+	                sudo docker run -d --name omni-${API_PORT} --restart=always \
+                        -p ${API_PORT}:80 -v nfs-${API_PORT}:/usr/share/nginx/html \
+                        --network jenkins --security-opt label=disable \
+                        -d nginx
+                """
                 cleanWs()
             }
         }
@@ -56,36 +61,123 @@ pipeline {
             }
             environment {
                 DOMAIN = credentials('hyperv-domain-login')
-                VSPHERE = credentials('fd83fe98-2754-4985-9276-12fbbf73d3bf')
                 OMNI_IP = credentials('omni-server-ip')
                 OMNI_USER = credentials('omni-scp-username')
-                ENVVISIPADDR = credentials('vsphere-ip')
-                ENVVISPROTOCOL = 'HTTPS'
                 HOST_ID = '2019-196-101'
                 ComposeVer = 'rhel-8.0.0'
                 IMAGE = "image-${ComposeVer}-test.vhdx"
+                
             }
             agent {
                 node {
                     label '3rd-CIVAN'
-                    customWorkspace "workspace/2016-g1-load-image-${env.BUILD_ID}"
+                    customWorkspace "workspace/hv-gating-load-image-${env.BUILD_ID}"
                 }
             }
             steps {
                 script {
-                    currentBuild.displayName = "hv-gating-${env.ComposeVer}-${env.id}"
+                    currentBuild.displayName = "hv-gating-load-image-${env.id}"
                 }
                 unstash "vars"
                 powershell '''
-                    $NVR = (get-content vars.properties | where-object {$_ -like "NVR*"}).split("=")[1]
-                    write-host "---------$NVR"
+                    ${env:NVR} = (get-content vars.properties | where-object {$_ -like "NVR*"}).split("=")[1]
+                    write-host "Info: Get NVR = ${env:NVR}"
+                    .\\ProvisionVM\\hyperv-run.ps1 -action add -nvr ${env:NVR} -Debug
                 '''
+                //RunPowershellCommand("write-host '---$NVR'; exit 100; #.\\ProvisionVM\\hyperv-run.ps1 -action add -nvr $env:NVR -Debug")
                 cleanWs()
             }
         }
 
+        stage('Provision VM with ansible') {
+            agent {
+                node {
+                    label '3rd-CIBUS'
+                    customWorkspace "workspace/2016-g1-provision-vm-${env.BUILD_ID}"
+                }
+            }
+            environment {
+                BREW_API = credentials('3rd-brew-api-address')
+            }
+            steps {
+                script {
+                    currentBuild.displayName = "hv-gating-provision-vm-${env.id}"
+                }
+                echo 'Running Ansible Container...'
+                unstash "vars"
+                sh """
+                    source vars.properties
+                    cd ProvisionVM/
+                    sudo cp /root/hosts playbook/
+                    echo '---------------'
+                    cat playbook/hosts
+                    echo ${URL_LIST}
+                    echo '---------------'
 
+                    #sudo docker build -t ansible -f ansible.dockerfile .
+                    sudo docker ps --quiet --all --filter 'name=ansible-test' | sudo xargs --no-run-if-empty docker rm -f
+                    sudo docker run --name ansible-test --rm -v /root/hosts:/ansible/hosts -v \$PWD/playbook/test.yml:/ansible/test.yml ansible ansible-playbook test.yml -i ./hosts --tags packages -e \"url=${URL_LIST}\" -v
+                """
+                cleanWs()
+            }
+        }
+
+        stage('Run Lisa') {
+            options {
+                timeout(time: 2, unit: 'HOURS')
+            }
+            environment {
+                DOMAIN = credentials('hyperv-domain-login')
+                OMNI_IP = credentials('omni-server-ip')
+                OMNI_USER = credentials('omni-scp-username')
+                HOST_ID = '2019-196-101'
+                NVR = ""
+            }
+            agent {
+                node {
+                    label '3rd-CIVAN'
+                    customWorkspace "workspace/hv-gating-run-lisa-${env.BUILD_ID}"
+                }
+            }
+            steps {
+                script {
+                    currentBuild.displayName = "hv-gating-run-lisa-${env.id}"
+                }
+                unstash "vars"
+                echo 'Checkout LISA Code'
+                checkout changelog: false, poll: false, scm: [$class: 'GitSCM', branches: [[name: '*/update_for_reset']], doGenerateSubmoduleConfigurations: false, extensions: [[$class: 'RelativeTargetDirectory', relativeTargetDir: 'lis']], submoduleCfg: [], userRemoteConfigs: [[url: 'https://github.com/lixuemin2016/lis-test']]]
+                powershell '''
+                    ${env:NVR} = (get-content vars.properties | where-object {$_ -like "NVR*"}).split("=")[1]
+                    write-host "Info: Get NVR = ${env:NVR}"
+                    .\\ProvisionVM\\hyperv-run.ps1 -action run -nvr ${env:NVR} -Debug
+                '''                
+                //RunPowershellCommand(".\\runner.ps1 -action add")
+                
+                //RunPowershellCommand(".\\ProvisionVM\\hyperv-run.ps1 -action run -nvr ${env:NVR}")
+                cleanWs()
+            }
+        }
     }
-
+    post {
+        always {
+            echo 'Stop and remove omni container'
+            echo 'Start result analyzer and email sender container'
+            echo 'Remove volume'
+            sh """
+                sudo docker ps --quiet --all --filter name=omni-${API_PORT} | sudo xargs docker stop
+                sudo docker ps --quiet --all | sudo xargs docker rm -f
+                #sudo docker run --rm --name mailbot-${API_PORT} \
+                #        -v kernels-volume-func-${API_PORT}:/kernels --network jenkins \
+                #        henrywangxf/jenkins:latest \
+                #        python3 ./mailbot.py --path /kernels --mail ${FROM} --task ${TASK_URL_PREFIX} --smtp ${SMTP} --hv ${HV}
+                sudo docker volume ls --quiet --filter name=nfs-${API_PORT} | sudo xargs docker volume rm
+                #sudo docker rmi -f ansible
+                #sudo docker rmi -f fedora:latest
+            """
+            // sudo docker volume ls --quiet --filter name=kernels-volume-${API_PORT} | sudo xargs --no-run-if-empty docker volume rm
+            // sudo docker rmi -f henrywangxf/jenkins:latest
+            cleanWs()
+        }
+    }
 }
             

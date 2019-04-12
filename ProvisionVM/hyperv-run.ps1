@@ -60,6 +60,7 @@ switch ($action)
             write-host "Error: Add vm failed, get return value - $ret"
             exit 100
         } else { write-host "Debug: Get return value - $ret"; exit 0}
+
     }
     "run"
     {

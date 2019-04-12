@@ -96,28 +96,21 @@ pipeline {
                     customWorkspace "workspace/2016-g1-provision-vm-${env.BUILD_ID}"
                 }
             }
-            environment {
-                BREW_API = credentials('3rd-brew-api-address')
-            }
             steps {
                 script {
                     currentBuild.displayName = "hv-gating-provision-vm-${env.id}"
                 }
                 echo 'Running Ansible Container...'
                 unstash "vars"
-                sh """
-                    source vars.properties
+                sh '''
+                    source ./vars.properties
                     cd ProvisionVM/
-                    sudo cp /root/hosts playbook/
-                    echo '---------------'
-                    cat playbook/hosts
-                    echo ${URL_LIST}
-                    echo '---------------'
+                    cat /root/hosts
 
-                    #sudo docker build -t ansible -f ansible.dockerfile .
-                    sudo docker ps --quiet --all --filter 'name=ansible-test' | sudo xargs --no-run-if-empty docker rm -f
-                    sudo docker run --name ansible-test --rm -v /root/hosts:/ansible/hosts -v \$PWD/playbook/test.yml:/ansible/test.yml ansible ansible-playbook test.yml -i ./hosts --tags packages -e \"url=${URL_LIST}\" -v
-                """
+                    sudo docker build -t ansible -f ansible.dockerfile .
+                    sudo docker ps --quiet --all --filter name=ansible-test | sudo xargs --no-run-if-empty docker rm -f
+                    sudo docker run --name ansible-test --rm -v /root/hosts:/ansible/hosts -v \$PWD/playbook/test.yml:/ansible/test.yml ansible ansible-playbook test.yml -i ./hosts --tags packages -e "url=${URL_LIST}" -v
+                '''
                 cleanWs()
             }
         }

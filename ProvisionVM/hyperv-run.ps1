@@ -57,9 +57,9 @@ switch ($action)
         } `
         -ArgumentList @($hostFolder, $action, $env:IMAGE, $gen2, ${env:OMNI_IP}, ${env:API_PORT}, $vmArray)
         if ( $ret -ne 0 ) { 
-            write-host "Error: add vm failed"
+            write-host "Error: Get return value $ret, add vm failed"
             exit 100
-        }
+        } else { write-host "Debug: Get return value $ret"; exit 0}
     }
     "run"
     {

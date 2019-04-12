@@ -56,10 +56,10 @@ switch ($action)
             return $LastExitCode
         } `
         -ArgumentList @($hostFolder, $action, $env:IMAGE, $gen2, ${env:OMNI_IP}, ${env:API_PORT}, $vmArray)
-        if ( $ret -ne 0 ) { 
-            write-host "Error: add vm failed"
+        if ( $ret[-1] -ne 0 ) { 
+            write-host "Error: Add vm failed, get return value - $ret"
             exit 100
-        }
+        } else { write-host "Debug: Get return value - $ret"; exit 0}
     }
     "run"
     {

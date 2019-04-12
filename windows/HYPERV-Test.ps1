@@ -32,7 +32,7 @@ function GetImage([String]$vmPath, [String]$vmName, [String]$image, [String]$ima
         write-host "Error: failed to download from ${imageURL}/${image} to $vmPath${vmName}.vhdx"
         return $false
     }
-    write-host "Info: Time taken: $((Get-Date).Subtract($start_time).Seconds) second(s) for downloading"
+    write-host "Debug: Time taken: $((Get-Date).Subtract($start_time).Seconds) second(s) for downloading"
     if (Test-Path "${vmPath}${vmName}.vhdx") {
         return $true
     } 
@@ -194,13 +194,11 @@ switch ($action)
             New-Item -ItemType file -Path $hosts | Out-Null
         }
         foreach ($i in $vmArray) {
-            write-host "DEBUG: $i"
+            write-host "DEBUG: vm is $i"
             $ip = VMStart -vmPath $vmPath -vmName $i -image $image -gen2 $gen2 -switchName $switchName -cpuCount $cpuCount -mem $memorySize
+            write-host "DEBUG: Get return value from VMStart : $ip"
             if ( $ip[-1] ) {
-                Write-output $ip[-1] | Out-File -FilePath $hosts -Append -Encoding ASCII
-                write-host "INFO: get-content hosts"
-                get-content $hosts
-                write-host "-----------------"
+                $ip[-1] | Out-File -FilePath $hosts -Append -Encoding ASCII
             } else { exit 100 }            
         }
         Write-Output y | pscp -l root -i ssh\3rd_id_rsa.ppk $hosts root@${omni_ip}:/root/

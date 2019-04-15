@@ -201,7 +201,7 @@ switch ($action)
                 $ip[-1] | Out-File -FilePath $hosts -Append -Encoding ASCII
             } else { exit 100 }            
         }
-        Write-Output y | pscp -l root -i ssh\3rd_id_rsa.ppk $hosts root@${omni_ip}:/root/
+        Write-Output y | pscp -q -l root -i ssh\3rd_id_rsa.ppk $hosts root@${omni_ip}:/root/
         exit 0          
     }
     "del"
